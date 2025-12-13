@@ -1,0 +1,81 @@
+services:
+  k3s-server:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    privileged: true
+    restart: always
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+    command: 
+    - server
+    - --disable=traefik
+    tmpfs:
+    - /run
+    - /var/run
+    environment:
+    - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+    - K3S_KUBECONFIG_MODE=666
+    volumes:
+    - k3s-server:/var/lib/rancher/k3s
+    # This is just so that we get the kubeconfig file out
+    - ${KUBECONFIG_DIR:-./cluster-a-kubeconfig}:/output
+    ports:
+    - ${K3S_API_PORT:-6443}:6443      # Kubernetes API Server
+    - ${INGRESS_HTTP_PORT:-80}:80     # Ingress controller port 80
+    - ${INGRESS_HTTPS_PORT:-443}:443  # Ingress controller port 443
+
+  k3s-agent:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    tmpfs:
+    - /run
+    - /var/run
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+    privileged: true
+    restart: always
+    environment:
+    - K3S_URL=https://k3s-server:6443
+    - K3S_TOKEN_FILE=/server-token/server/node-token
+    volumes:
+    - k3s-agent:/var/lib/rancher/k3s
+    - k3s-server:/server-token:ro
+    - ./registries.yaml:/etc/rancher/k3s/registries.yaml:ro
+    healthcheck:
+      test: ["CMD", "test", "-d", "/var/lib/rancher/k3s/agent"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  helm-bastion:
+    image: "dtzar/helm-kubectl:3.16"
+    tty: true
+    stdin_open: true
+    command: ["/root/wait-for.sh", "https://k3s-server:6443/livez", "/bin/bash", "/root/bootstrap.sh"]
+    environment:
+      - KUBECONFIG=/root/kubeconfig.yaml
+    volumes:
+      - ${KUBECONFIG_DIR:-./cluster-a-kubeconfig}:/opt/kubeconfig:ro
+      - ${PWD}/bootstrap.sh:/root/bootstrap.sh:ro
+      - ${PWD}/wait-for.sh:/root/wait-for.sh:ro
+    depends_on:
+      - k3s-server
+      - k3s-agent
+      - local-registry
+
+  local-registry:
+    image: registry:2
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+volumes:
+  k3s-server: {}
+  k3s-agent: {}
+  registry-data: {}
