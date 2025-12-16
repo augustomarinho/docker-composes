@@ -21,6 +21,7 @@ services:
     - k3s-server:/var/lib/rancher/k3s
     # This is just so that we get the kubeconfig file out
     - ${KUBECONFIG_DIR:-./cluster-a-kubeconfig}:/output
+    - ./registries.yaml:/etc/rancher/k3s/registries.yaml:ro
     ports:
     - ${K3S_API_PORT:-6443}:6443      # Kubernetes API Server
     - ${INGRESS_HTTP_PORT:-80}:80     # Ingress controller port 80
