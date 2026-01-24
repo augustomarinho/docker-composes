@@ -1,0 +1,36 @@
+version: '3.9'
+
+services:
+  primary-db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: primary-timescale
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: bankdb
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: timescaledb
+    ports:
+      - "5432:5432"
+    volumes:
+      - primary-data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./init/primary:/docker-entrypoint-initdb.d
+
+  archival-db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: archival-timescale
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: bankdb
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: timescaledb
+    ports:
+      - "5433:5432"
+    volumes:
+      - archival-data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./init/archival:/docker-entrypoint-initdb.d
+
+volumes:
+  primary-data:
+  archival-data:
